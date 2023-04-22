@@ -1,7 +1,7 @@
 import unittest
 
 import torch
-from hydra import initialize, compose
+from hydra import compose, initialize
 
 from model.classifier import SimpleClassifier
 
@@ -14,7 +14,8 @@ class TestClassifier(unittest.TestCase):
             self.classifier = SimpleClassifier(cfg)
 
     def test_classifier(self):
-        data = torch.zeros(8, self.cfg.model.input_channels, self.cfg.model.h,
-                           self.cfg.model.w)
+        data = torch.zeros(
+            8, self.cfg.model.input_channels, self.cfg.model.h, self.cfg.model.w
+        )
         output = self.classifier(data)
-        self.assertEqual(output.size(), (8, self.cfg.model.num_class))
+        self.assertEqual(output.size(), (8, self.cfg.model.num_classes))

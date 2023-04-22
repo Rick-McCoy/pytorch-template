@@ -1,21 +1,23 @@
-import os
+from pathlib import Path
 
 import hydra
 from hydra.utils import to_absolute_path
+from lightning.pytorch.callbacks import DeviceStatsMonitor, ModelCheckpoint
+from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.trainer import Trainer
+from lightning.pytorch.tuner import Tuner
 from omegaconf import DictConfig
-from pytorch_lightning.callbacks import DeviceStatsMonitor, ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.trainer import Trainer
 
 from data.datamodule import SimpleDataModule
 from model.model import SimpleModel
 
 
 @hydra.main(config_path="config", config_name="config")
-def main(cfg: DictConfig = None) -> None:
+def main(cfg: DictConfig) -> None:
     model = SimpleModel(cfg)
     datamodule = SimpleDataModule(cfg)
     callbacks = []
+
     if cfg.train.checkpoint:
         callbacks.append(
             ModelCheckpoint(
@@ -25,17 +27,18 @@ def main(cfg: DictConfig = None) -> None:
                 save_top_k=3,
                 mode="min",
                 save_weights_only=True,
-            ))
+            )
+        )
+
     if cfg.train.monitor:
         callbacks.append(DeviceStatsMonitor())
-    logger = TensorBoardLogger(save_dir=to_absolute_path("log"),
-                               name=cfg.name,
-                               log_graph=True)
+    logger = WandbLogger(
+        project=cfg.train.project,
+        save_dir=to_absolute_path("logs"),
+    )
     trainer = Trainer(
         accelerator="auto",
         accumulate_grad_batches=cfg.train.acc,
-        auto_lr_find=cfg.train.auto_lr,
-        auto_scale_batch_size=cfg.train.auto_batch,
         callbacks=callbacks,
         detect_anomaly=True,
         devices="auto",
@@ -43,15 +46,23 @@ def main(cfg: DictConfig = None) -> None:
         logger=[logger],
         num_sanity_val_steps=2,
     )
+    tuner = Tuner(trainer)
 
-    trainer.tune(model=model, datamodule=datamodule)
+    if cfg.train.auto_lr:
+        tuner.lr_find(model=model, datamodule=datamodule)
+
+    if cfg.train.auto_batch:
+        tuner.scale_batch_size(model=model, datamodule=datamodule)
+
     trainer.fit(model=model, datamodule=datamodule)
     trainer.test(model=model, datamodule=datamodule)
 
-    os.makedirs("onnx", exist_ok=True)
-    model.to_onnx(file_path=to_absolute_path(os.path.join(
-        "onnx", "model.onnx")),
-                  export_params=True)
+    onnx_dir = Path("onnx")
+    onnx_dir.mkdir(parents=True, exist_ok=True)
+    model.to_onnx(
+        file_path=to_absolute_path(str(onnx_dir / "model.onnx")),
+        export_params=True,
+    )
 
 
 if __name__ == "__main__":
