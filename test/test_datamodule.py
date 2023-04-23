@@ -1,9 +1,11 @@
 import unittest
+from typing import cast
 
 import torch
 from hydra import compose, initialize
 from torch import Tensor
 
+from config.config import Config
 from data.datamodule import SimpleDataModule
 
 
@@ -11,8 +13,8 @@ class TestDataModule(unittest.TestCase):
     def setUp(self) -> None:
         with initialize(config_path="../config"):
             cfg = compose(config_name="config")
-            self.cfg = cfg
-            self.module = SimpleDataModule(cfg)
+            self.cfg = cast(Config, cfg)
+            self.module = SimpleDataModule(self.cfg)
 
         self.module.prepare_data()
         self.module.setup()

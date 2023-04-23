@@ -2,18 +2,18 @@ from typing import List
 
 import torch
 import wandb
-from lightning.pytorch import LightningModule
+from lightning import LightningModule
 from lightning.pytorch.loggers import WandbLogger
-from omegaconf import DictConfig
 from torch import Tensor
 from torchmetrics.classification import MulticlassAccuracy
 
+from config.config import Config
 from model.classifier import SimpleClassifier
 from model.loss import SimpleLoss
 
 
 class SimpleModel(LightningModule):
-    def __init__(self, cfg: DictConfig) -> None:
+    def __init__(self, cfg: Config) -> None:
         super().__init__()
         self.cfg = cfg
         self.learning_rate = cfg.train.lr
@@ -49,9 +49,9 @@ class SimpleModel(LightningModule):
         output = self(data)
         loss = self.loss(output, label)
         self.acc(output, label)
-        self.log("val/loss", loss, on_epoch=True)
-        self.log("val/acc", self.acc, on_epoch=True)
-        if batch_idx == 0:
+        self.log("val/loss", loss, on_epoch=True, sync_dist_group=True)
+        self.log("val/acc", self.acc, on_epoch=True, sync_dist_group=True)
+        if batch_idx == 0 and self.device.index == 0:
             pred = torch.argmax(output[0], dim=-1)
             self.log_table(data[0], pred, "val")
 
@@ -60,9 +60,9 @@ class SimpleModel(LightningModule):
         output = self(data)
         loss = self.loss(output, label)
         self.acc(output, label)
-        self.log("test/loss", loss, on_epoch=True)
-        self.log("test/acc", self.acc, on_epoch=True)
-        if batch_idx == 0:
+        self.log("test/loss", loss, on_epoch=True, sync_dist_group=True)
+        self.log("test/acc", self.acc, on_epoch=True, sync_dist_group=True)
+        if batch_idx == 0 and self.device.index == 0:
             pred = torch.argmax(output[0], dim=-1)
             self.log_table(data[0], pred, "test")
 

@@ -1,5 +1,6 @@
 import unittest
 from pathlib import Path
+from typing import cast
 
 import torch
 from hydra.compose import compose
@@ -7,13 +8,15 @@ from hydra.initialize import initialize
 from torch import Tensor
 from torch.utils.data.dataset import Dataset
 
+from config.config import Config
 from data.utils import get_mnist, load_mnist
 
 
 class TestDataUtils(unittest.TestCase):
     def setUp(self) -> None:
         with initialize(config_path="../config"):
-            self.cfg = compose(config_name="config")
+            cfg = compose(config_name="config")
+            self.cfg = cast(Config, cfg)
 
         load_mnist(".")
         self.train, self.val, self.test = get_mnist(".")

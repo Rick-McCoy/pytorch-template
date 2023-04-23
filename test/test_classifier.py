@@ -1,8 +1,10 @@
 import unittest
+from typing import cast
 
 import torch
 from hydra import compose, initialize
 
+from config.config import Config
 from model.classifier import SimpleClassifier
 
 
@@ -10,8 +12,8 @@ class TestClassifier(unittest.TestCase):
     def setUp(self) -> None:
         with initialize(config_path="../config"):
             cfg = compose(config_name="config")
-            self.cfg = cfg
-            self.classifier = SimpleClassifier(cfg)
+            self.cfg = cast(Config, cfg)
+            self.classifier = SimpleClassifier(self.cfg)
 
     def test_classifier(self):
         data = torch.zeros(

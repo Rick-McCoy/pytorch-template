@@ -1,9 +1,11 @@
 import unittest
+from typing import cast
 
 import numpy as np
 import torch
 from hydra import compose, initialize
 
+from config.config import Config
 from model.loss import SimpleLoss
 
 
@@ -11,8 +13,8 @@ class TestLoss(unittest.TestCase):
     def setUp(self) -> None:
         with initialize(config_path="../config"):
             cfg = compose(config_name="config")
-            self.cfg = cfg
-            self.loss = SimpleLoss(cfg)
+            self.cfg = cast(Config, cfg)
+            self.loss = SimpleLoss(self.cfg)
 
     def test_loss(self):
         logit_1 = torch.zeros(8, self.cfg.model.num_classes)

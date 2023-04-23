@@ -1,14 +1,14 @@
 from typing import Optional
 
-from lightning.pytorch import LightningDataModule
-from omegaconf.dictconfig import DictConfig
+from lightning import LightningDataModule
 from torch.utils.data.dataloader import DataLoader
 
+from config.config import Config
 from data.utils import get_mnist, load_mnist
 
 
 class SimpleDataModule(LightningDataModule):
-    def __init__(self, cfg: DictConfig):
+    def __init__(self, cfg: Config):
         super().__init__()
         self.cfg = cfg
         self.batch_size = cfg.train.batch_size
