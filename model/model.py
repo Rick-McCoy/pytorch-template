@@ -51,8 +51,8 @@ class SimpleModel(LightningModule):
         output = self(data)
         loss = self.loss(output, label)
         self.acc(output, label)
-        self.log("val/loss", loss, on_epoch=True, sync_dist_group=True)
-        self.log("val/acc", self.acc, on_epoch=True, sync_dist_group=True)
+        self.log("val/loss", loss, on_epoch=True, sync_dist=True)
+        self.log("val/acc", self.acc, on_epoch=True, sync_dist=True)
         if batch_idx == 0 and self.device.index == 0:
             pred = torch.argmax(output[0], dim=-1)
             self.log_table(data[0], pred, "val")
@@ -62,8 +62,8 @@ class SimpleModel(LightningModule):
         output = self(data)
         loss = self.loss(output, label)
         self.acc(output, label)
-        self.log("test/loss", loss, on_epoch=True, sync_dist_group=True)
-        self.log("test/acc", self.acc, on_epoch=True, sync_dist_group=True)
+        self.log("test/loss", loss, on_epoch=True, sync_dist=True)
+        self.log("test/acc", self.acc, on_epoch=True, sync_dist=True)
         if batch_idx == 0 and self.device.index == 0:
             pred = torch.argmax(output[0], dim=-1)
             self.log_table(data[0], pred, "test")

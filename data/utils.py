@@ -1,4 +1,3 @@
-import torch
 from torch.utils.data.dataset import random_split
 from torchvision import transforms
 from torchvision.datasets import MNIST
@@ -12,8 +11,8 @@ def load_mnist(path: str) -> None:
 def get_mnist(path: str):
     mnist_transforms = transforms.Compose(
         [
-            transforms.PILToTensor(),
-            transforms.ConvertImageDtype(torch.float32),
+            transforms.ToTensor(),
+            transforms.Normalize((0.1307,), (0.3081,)),
         ]
     )
     train_val_dataset = MNIST(root=path, train=True, transform=mnist_transforms)

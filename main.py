@@ -21,7 +21,7 @@ from model.model import SimpleModel
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: Config):
     model = SimpleModel(cfg)
-    compiled_model = torch.compile(model, disable=True)
+    compiled_model = torch.compile(model)
     datamodule = SimpleDataModule(cfg)
     callbacks = []
 
@@ -69,7 +69,7 @@ def main(cfg: Config):
         strategy="ddp",
         accumulate_grad_batches=cfg.train.acc,
         callbacks=callbacks,
-        detect_anomaly=True,
+        # detect_anomaly=True,
         devices="auto",
         fast_dev_run=cfg.train.fast_dev_run,
         logger=[logger],
@@ -87,10 +87,6 @@ def main(cfg: Config):
 
     trainer.fit(model=compiled_model, datamodule=datamodule)
     trainer.test(model=compiled_model, datamodule=datamodule)
-
-    onnx_dir = Path("onnx")
-    onnx_dir.mkdir(parents=True, exist_ok=True)
-    compiled_model.to_onnx(file_path=onnx_dir / "model.onnx", export_params=True)
 
 
 if __name__ == "__main__":
