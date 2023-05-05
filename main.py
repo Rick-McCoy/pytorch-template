@@ -1,9 +1,11 @@
 import time
 from pathlib import Path
+from typing import cast
 
 import hydra
 import torch
 import torch._dynamo.config
+import wandb
 from lightning import Trainer
 from lightning.pytorch.callbacks import (
     DeviceStatsMonitor,
@@ -22,14 +24,31 @@ from model.model import SimpleModel
 def main(cfg: Config):
     model = SimpleModel(cfg)
     compiled_model = torch.compile(model)
+    compiled_model = cast(SimpleModel, compiled_model)
     datamodule = SimpleDataModule(cfg)
+
+    Path("logs").mkdir(exist_ok=True)
+    if cfg.train.fast_dev_run:
+        logger = TensorBoardLogger(
+            save_dir="logs",
+            name="fast_dev_run",
+            log_graph=True,
+        )
+    else:
+        logger = WandbLogger(project=cfg.train.project)
+
     callbacks = []
 
     if cfg.train.checkpoint:
+        checkpoint_dir = Path("checkpoints")
+        if wandb.run is not None:
+            checkpoint_dir /= wandb.run.name
+        else:
+            checkpoint_dir /= str(int(time.time()))
         callbacks.append(
             ModelCheckpoint(
-                dirpath=Path(f"checkpoints/{int(time.time())}"),
-                filename="{epoch}-val_loss={val/loss:.3f}",
+                dirpath=checkpoint_dir,
+                filename="{epoch:03d}-val_loss={val/loss:.4f}",
                 monitor="val/loss",
                 save_top_k=3,
                 mode="min",
@@ -51,15 +70,6 @@ def main(cfg: Config):
                 mode="min",
             )
         )
-
-    if cfg.train.fast_dev_run:
-        logger = TensorBoardLogger(
-            save_dir="logs",
-            name="fast_dev_run",
-            log_graph=True,
-        )
-    else:
-        logger = WandbLogger(project=cfg.train.project, save_dir="logs")
 
     if torch.cuda.is_available():
         torch.set_float32_matmul_precision("medium")
@@ -90,5 +100,4 @@ def main(cfg: Config):
 
 
 if __name__ == "__main__":
-    torch._dynamo.config.verbose = True
     main()
