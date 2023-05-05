@@ -1,4 +1,4 @@
-from typing import List
+from typing import Tuple
 
 import torch
 import wandb
@@ -35,7 +35,7 @@ class SimpleModel(LightningModule):
     def forward(self, data: Tensor, *args, **kwargs) -> Tensor:
         return self.classifier(data)
 
-    def training_step(self, batch: List[Tensor], *args, **kwargs) -> Tensor:
+    def training_step(self, batch: Tuple[Tensor, Tensor], *args, **kwargs) -> Tensor:
         data, label = batch
         output = self(data)
         loss = self.loss(output, label)
@@ -44,7 +44,9 @@ class SimpleModel(LightningModule):
         self.log("train/acc", self.acc, on_step=True, prog_bar=True)
         return loss
 
-    def validation_step(self, batch: List[Tensor], batch_idx: int, *args, **kwargs):
+    def validation_step(
+        self, batch: Tuple[Tensor, Tensor], batch_idx: int, *args, **kwargs
+    ):
         data, label = batch
         output = self(data)
         loss = self.loss(output, label)
@@ -55,7 +57,7 @@ class SimpleModel(LightningModule):
             pred = torch.argmax(output[0], dim=-1)
             self.log_table(data[0], pred, "val")
 
-    def test_step(self, batch: List[Tensor], batch_idx: int, *args, **kwargs):
+    def test_step(self, batch: Tuple[Tensor, Tensor], batch_idx: int, *args, **kwargs):
         data, label = batch
         output = self(data)
         loss = self.loss(output, label)

@@ -36,16 +36,18 @@ class SimpleClassifier(nn.Module):
             padding=padding,
             padding_mode="reflect",
         )
-        # max_pool = nn.MaxPool2d(kernel_size=2, stride=2)
-        # resblock_list: List[nn.Module] = [
-        #     SimpleResidualBlock(cfg) for _ in range(cfg.model.num_layers)
-        # ]
-        # resblock_list.insert(cfg.model.num_layers // 2, max_pool)
-        # resblock_list.append(max_pool)
-        # self.resblocks = nn.Sequential(*resblock_list)
+        max_pool = nn.MaxPool2d(kernel_size=2, stride=2)
+        self.resblocks = nn.Sequential(
+            *(
+                [SimpleResidualBlock(cfg) for _ in range(cfg.model.num_layers // 2)]
+                + [max_pool]
+                + [SimpleResidualBlock(cfg) for _ in range(cfg.model.num_layers // 2)]
+                + [max_pool]
+            )
+        )
         self.linear = nn.Linear(
             in_features=(
-                cfg.model.input_channels * (cfg.model.h // 4) * (cfg.model.w // 4) * 16
+                cfg.model.hidden_channels * (cfg.model.h // 4) * (cfg.model.w // 4)
             ),
             out_features=cfg.model.num_classes,
         )
@@ -53,11 +55,11 @@ class SimpleClassifier(nn.Module):
         self.flatten = nn.Flatten()
 
     def forward(self, data: Tensor) -> Tensor:
-        # hidden = self.pre_conv(data)
-        # hidden = self.relu(hidden)
-        # data = data + hidden
+        hidden = self.pre_conv(data)
+        hidden = self.relu(hidden)
+        data = data + hidden
 
-        # data = self.resblocks(data)
+        data = self.resblocks(data)
 
         data = self.flatten(data)
         data = self.linear(data)

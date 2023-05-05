@@ -11,7 +11,10 @@ def load_mnist(path: str) -> None:
 
 def get_mnist(path: str):
     mnist_transforms = transforms.Compose(
-        [transforms.PILToTensor(), transforms.ConvertImageDtype(torch.float32)]
+        [
+            transforms.PILToTensor(),
+            transforms.ConvertImageDtype(torch.float32),
+        ]
     )
     train_val_dataset = MNIST(root=path, train=True, transform=mnist_transforms)
     test_dataset = MNIST(root=path, train=False, transform=mnist_transforms)

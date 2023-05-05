@@ -21,8 +21,7 @@ from model.model import SimpleModel
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: Config):
     model = SimpleModel(cfg)
-    # compiled_model = torch.compile(model, mode="reduce-overhead")
-    compiled_model = model
+    compiled_model = torch.compile(model, disable=True)
     datamodule = SimpleDataModule(cfg)
     callbacks = []
 
@@ -67,6 +66,7 @@ def main(cfg: Config):
 
     trainer = Trainer(
         accelerator="auto",
+        strategy="ddp",
         accumulate_grad_batches=cfg.train.acc,
         callbacks=callbacks,
         detect_anomaly=True,
