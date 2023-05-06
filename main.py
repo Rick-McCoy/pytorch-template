@@ -1,57 +1,102 @@
-import os
+import time
+from pathlib import Path
+from typing import cast
 
 import hydra
-from hydra.utils import to_absolute_path
-from omegaconf import DictConfig
-from pytorch_lightning.callbacks import DeviceStatsMonitor, ModelCheckpoint
-from pytorch_lightning.loggers import TensorBoardLogger
-from pytorch_lightning.trainer import Trainer
+import torch
+import torch._dynamo.config
+import wandb
+from lightning import Trainer
+from lightning.pytorch.callbacks import (
+    DeviceStatsMonitor,
+    EarlyStopping,
+    ModelCheckpoint,
+)
+from lightning.pytorch.loggers import TensorBoardLogger, WandbLogger
+from lightning.pytorch.tuner import Tuner
 
+from config.config import Config
 from data.datamodule import SimpleDataModule
 from model.model import SimpleModel
 
 
-@hydra.main(config_path="config", config_name="config")
-def main(cfg: DictConfig = None) -> None:
+@hydra.main(config_path="config", config_name="config", version_base=None)
+def main(cfg: Config):
     model = SimpleModel(cfg)
+    compiled_model = torch.compile(model)
+    compiled_model = cast(SimpleModel, compiled_model)
     datamodule = SimpleDataModule(cfg)
+
+    Path("logs").mkdir(exist_ok=True)
+    if cfg.train.fast_dev_run:
+        logger = TensorBoardLogger(
+            save_dir="logs",
+            name="fast_dev_run",
+            log_graph=True,
+        )
+    else:
+        logger = WandbLogger(project=cfg.train.project)
+
     callbacks = []
+
     if cfg.train.checkpoint:
+        checkpoint_dir = Path("checkpoints")
+        if wandb.run is not None:
+            checkpoint_dir /= wandb.run.name
+        else:
+            checkpoint_dir /= str(int(time.time()))
         callbacks.append(
             ModelCheckpoint(
-                dirpath=to_absolute_path("checkpoints"),
-                filename="{epoch}-{val_loss:.3f}",
-                monitor="val_loss",
+                dirpath=checkpoint_dir,
+                filename="{epoch:03d}-val_loss={val/loss:.4f}",
+                monitor="val/loss",
                 save_top_k=3,
                 mode="min",
+                auto_insert_metric_name=False,
                 save_weights_only=True,
-            ))
+            )
+        )
+
     if cfg.train.monitor:
         callbacks.append(DeviceStatsMonitor())
-    logger = TensorBoardLogger(save_dir=to_absolute_path("log"),
-                               name=cfg.name,
-                               log_graph=True)
+
+    if cfg.train.early_stop:
+        callbacks.append(
+            EarlyStopping(
+                monitor="val/loss",
+                min_delta=0.00,
+                patience=3,
+                verbose=False,
+                mode="min",
+            )
+        )
+
+    if torch.cuda.is_available():
+        torch.set_float32_matmul_precision("medium")
+
     trainer = Trainer(
         accelerator="auto",
+        strategy="ddp",
         accumulate_grad_batches=cfg.train.acc,
-        auto_lr_find=cfg.train.auto_lr,
-        auto_scale_batch_size=cfg.train.auto_batch,
         callbacks=callbacks,
-        detect_anomaly=True,
+        # detect_anomaly=True,
         devices="auto",
         fast_dev_run=cfg.train.fast_dev_run,
         logger=[logger],
+        max_epochs=-1,
         num_sanity_val_steps=2,
+        precision=cfg.train.precision,
     )
+    tuner = Tuner(trainer)
 
-    trainer.tune(model=model, datamodule=datamodule)
-    trainer.fit(model=model, datamodule=datamodule)
-    trainer.test(model=model, datamodule=datamodule)
+    if cfg.train.auto_lr and not cfg.train.fast_dev_run:
+        tuner.lr_find(model=compiled_model, datamodule=datamodule)
 
-    os.makedirs("onnx", exist_ok=True)
-    model.to_onnx(file_path=to_absolute_path(os.path.join(
-        "onnx", "model.onnx")),
-                  export_params=True)
+    if cfg.train.auto_batch and not cfg.train.fast_dev_run:
+        tuner.scale_batch_size(model=compiled_model, datamodule=datamodule)
+
+    trainer.fit(model=compiled_model, datamodule=datamodule)
+    trainer.test(model=compiled_model, datamodule=datamodule)
 
 
 if __name__ == "__main__":
